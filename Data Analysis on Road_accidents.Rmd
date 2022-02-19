@@ -1,0 +1,416 @@
+---
+title: "Road traffic Accidents Resulting in Casualty"
+author: "Group 31- mvk2, rc471, srb60, pj123"
+output:
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+
+
+
+
+## Objective {.smaller}
+To analyse the road traffic accidents in the UK, we are using STATS19, which is Great Britain’s official road traffic casualty database.
+
+Problem Statements
+
+1. What time of day and day of the week, most number of serious accidents happened in year 2020?</n>
+
+2. Compare the Hospital Episode Statistics(HES) casualty data with STATS19 casualty data by road user type for England in year 2020? </n>
+
+3.Which vehicle model type has most number of casualties in year 2020?
+
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+options(knitr.duplicate.label = "allow")
+# Load the necessary packages
+library(tidyverse)
+library(lubridate)
+library(stats19)
+library(here)
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+# Load the dataset
+casualty_2020 = get_stats19(year = 2020, type = "casualty")
+accident_2020 = get_stats19(year = 2020, type = "accident")
+id <- "16wvf84fNlID7xCGkEXFLn-Q_AzXRhy84" 
+vehicle_2020 <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+casualty_2019 = get_stats19(year = 2019, type = "casualty")
+accident_2019 = get_stats19(year = 2019, type = "accident")
+id <- "1X9MAR7x87Tho74QQRp6Gy2FXQXGu6JYv" # google file ID
+hes <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+id <- "1CYGNb6rdRyf7E07xvNpeF6nCy6i3pSKb" # google file 
+gb <- read.csv(sprintf("https://docs.google.com/uc?id=%s&export=download", id))
+
+```
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+a2020 <- accident_2020
+
+```
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+nrow(a2020)
+ncol(a2020)
+names(a2020)
+# str(a2020)
+summary(a2020)
+```
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_days<-
+  a2020%>%
+  group_by(day_of_week)%>%
+  summarise(Number_of_accidents=n())
+  
+accident_days$day_of_week<-factor(accident_days$day_of_week,levels=c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"))
+accident_days<-accident_days[order(accident_days$day_of_week), ]
+accident_days
+```
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_severity_days<-a2020%>%
+  select(day_of_week,accident_severity)%>%
+  group_by(day_of_week,accident_severity)%>%
+  summarise(Number_of_accidents=n(),.groups = "keep")
+accident_severity_days
+
+```
+
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_severity_days_fatal<-
+  accident_severity_days%>%  
+  filter(accident_severity=="Fatal")%>%
+  arrange(desc(Number_of_accidents))
+
+accident_severity_days_fatal
+```
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_severity_days_fatal<-
+  accident_severity_days_fatal%>%
+  mutate(Percentage=round(Number_of_accidents/sum(accident_severity_days_fatal$Number_of_accidents)*100,2))
+accident_severity_days_fatal
+  
+  
+
+```
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_severity_days%>%  
+  filter(accident_severity=="Serious")%>%
+  arrange(desc(Number_of_accidents))
+```
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+accident_severity_days%>%  
+  filter(accident_severity=="Slight")%>%
+  arrange(desc(Number_of_accidents))
+```
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+library(lubridate)
+Time_day<-
+  a2020%>%
+  select(time)%>%
+  mutate(time=hms(time))%>%
+  mutate(TimePeriod=case_when(
+                            time>="6H" & time<"12H" ~ "Morning",
+                            time>="12H" & time<"18H" ~ "Afternoon",
+                            time>="18H" & time<"24H" ~ "Evening",
+                            time>="0H" & time<"6H" ~ "Midnight",
+                            TRUE~"other"))%>%
+  group_by(TimePeriod)%>%
+  summarise(Number_of_accidents=n())
+
+Time_day
+```
+
+
+
+## Q1:Graphs showing accidents by day of a week and time of the day{.smaller}
+These time periods are derived by dividing the time in a day into four equal parts. We can observe that most accidents happen during thursday,friday, saturday, sunday specifically in the afternoon 
+
+
+
+```{r,figures-side, fig.show="hold", out.width="50%",warning = FALSE, message = FALSE, include = TRUE}
+ggplot(accident_days, aes(x = day_of_week, y = Number_of_accidents)) +
+    geom_bar(aes(fill = day_of_week),stat = "identity",width=0.5,show.legend = FALSE)+ggtitle("Accidents by Day of the week ") +  xlab("Day of the week") + ylab("Accidents number")
+
+ggplot(Time_day, aes(x = TimePeriod, y = Number_of_accidents)) +
+    geom_bar(aes(fill = TimePeriod),stat = "identity",width = 0.5, show.legend = FALSE)+ggtitle("Accidents by time period of the day ") +  xlab("Time period of day") + ylab("Accidents number")
+```
+
+## Graph showing casualty severity according to the time period{.smaller}
+By grouping the time periods we derived by the severity of the casualty we can observe that slight accidents are highest during afternoons 
+
+```{r,warning = FALSE, message = FALSE,out.width="80%", include = TRUE}
+Time_day_severity<-
+  a2020%>%
+  select(time,accident_severity)%>%
+  mutate(time=hms(time))%>%
+  mutate(TimePeriod=case_when(
+                            time>="6H" & time<"12H" ~ "Morning",
+                            time>="12H" & time<"18H" ~ "Afternoon",
+                            time>="18H" & time<"24H" ~ "Evening",
+                            time>="0H" & time<"6H" ~ "Midnight",
+                            TRUE~"other"))%>%
+  group_by(TimePeriod,accident_severity)%>%
+  summarise(Number_of_accidents=n(),.groups = "keep")
+  
+  
+
+ggplot(Time_day_severity, aes(fill=accident_severity,x = TimePeriod, y = Number_of_accidents)) +
+    geom_bar(position="dodge",stat = "identity")+ggtitle("Accidents By severity and time period of day")+  xlab("Time period of day by severity") + ylab("Accidents number")
+  
+```
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+Time_day_severity<-
+  Time_day_severity%>%
+  filter(accident_severity=="Fatal")
+Time_day_severity
+#ggplot(Time_day_severity, aes(fill=accident_severity,x = TimePeriod, y = Number_of_accidents)) +
+  #  geom_bar(position="dodge",stat = "identity")
+```
+
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+a2019 = accident_2019
+
+Date_wise_accidents2019<-a2019%>%
+
+arrange(date)%>%
+  group_by(date)%>%
+  summarise(Number_of_accidents=n())
+Date_wise_accidents2019
+
+Date_wise_accidents<-a2020%>%
+
+arrange(date)%>%
+  group_by(date)%>%
+  summarise(Number_of_accidents=n())
+Date_wise_accidents
+
+
+```
+
+## Time series Graph of Accidents for years 2019 and 2020{.Smaller}
+We can say that a huge decrease of accident rate happened around the month April 2020 to May 2020. This is to be directly related to the COVID-19 related restrictions.
+
+```{r,warning = FALSE, message = FALSE,out.width="70%", include = TRUE}
+ggplot(Date_wise_accidents, aes(x = date, y = Number_of_accidents)) + geom_line()+geom_line(data = Date_wise_accidents2019,aes(x = date, y = Number_of_accidents),color="red")+ggtitle("Time series for accidents 2019, 2020")+ xlab("Years") + ylab("Accidents number")
+```
+
+
+```{r,warning = FALSE, message = FALSE, include = FALSE}
+Timewise_accidents<-
+accident_2020%>%
+select(day_of_week,time,accident_severity)%>%
+
+filter(day_of_week=="Thursday" | day_of_week=="Friday" | day_of_week=="Saturday" | day_of_week=="Sunday")%>%
+filter(accident_severity=="Fatal" | accident_severity=="Serious")%>%
+mutate(time=hms(time))%>%
+mutate(Time24parts=case_when(
+time>="0H" & time<"1H" ~ "0-1",
+time>="1H" & time<"2H" ~ "1-2",
+time>="2H" & time<"3H" ~ "2-3",
+time>="3H" & time<"4H" ~ "3-4",
+time>="4H" & time<"5H" ~ "4-5",
+time>="5H" & time<"6H" ~ "5-6",
+time>="6H" & time<"7H" ~ "6-7",
+time>="7H" & time<"8H" ~ "7-8",
+time>="8H" & time<"9H" ~ "8-9",
+time>="9H" & time<"10H" ~ "9-10",
+time>="10H" & time<"11H" ~ "10-11",
+time>="11H" & time<"12H" ~ "11-12",
+time>="12H" & time<"13H" ~ "12-13",
+time>="13H" & time<"14H" ~ "13-14",
+time>="14H" & time<"15H" ~ "14-15",
+time>="15H" & time<"16H" ~ "15-16",
+time>="16H" & time<"17H" ~ "16-17",
+time>="17H" & time<"18H" ~ "17-18",
+time>="18H" & time<"19H" ~ "18-19",
+time>="19H" & time<"20H" ~ "19-20",
+time>="20H" & time<"21H" ~ "20-21",
+time>="21H" & time<"22H" ~ "21-22",
+time>="22H" & time<"23H" ~ "22-23",
+time>="23H" & time<"24H" ~ "23-0",
+TRUE~"other"))%>%
+group_by(Time24parts)%>%
+summarise(Number_of_accidents=n())%>%
+arrange(desc(Number_of_accidents))
+
+Timewise_accidents
+```
+
+## Graph showing Number of Fatal and Serious accidents by time of the day {.smaller}
+The graph shows accidents that took place on the days Thursday,Friday,Saturday and Sunday which is more than 50% of accidents in a week.
+
+```{r,warning = FALSE, message = FALSE,out.width="80%", include = TRUE}
+ggplot(Timewise_accidents, aes(x = Time24parts, y = Number_of_accidents)) +
+geom_bar(aes(fill = Time24parts),stat = "identity",show.legend = FALSE)+coord_flip()+ggtitle("Fatal Accidents By time")+ xlab("Time (24 Hr)") + ylab("Accidents number")
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+# ------
+#For information about no. of rows,columns,variables,its data types.
+c2020r <- casualty_2020
+c2019r <- casualty_2019
+a2020 <- accident_2020
+a2019 <- accident_2019
+
+```
+
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+gb<-gb$LAD21CD
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+new<-a2020 %>%
+      filter(local_authority_ons_district  %in% gb)
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+c2020<-c2020r %>%
+      filter(accident_index  %in% new$accident_index)
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+c2020$c_type_n<-as.numeric(factor(c2020$casualty_type))#factorising casualty type
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+c2020 <- 
+  c2020 %>% 
+  mutate(ctype_comp = case_when(
+                     c_type_n == 18~ "Pedestrian",
+                     c_type_n == 4 ~ "Pedal cyclist",
+                     c_type_n %in% c(5,13,14,15,16,11,12) ~ "Motor cyclist",
+                     c_type_n %in% c(3,19) ~ "Car occupant",
+                     c_type_n == 2 ~ "Bus occupant",
+                     c_type_n %in% c(21,10) ~ "Van occupant",
+                     c_type_n %in% c(7,6,8) ~ "HGV Occupant",
+                     c_type_n %in% c(17,20,9,1) ~ "Other Vehicle Occupant"
+  ))
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+(k <-c2020%>%count(ctype_comp)) #storing to dataframe k the different type of road user and the number
+options(knitr.duplicate.label = "allow")
+```
+
+
+## Q2:Casualties of road user type by Gender for year 2020{.smaller}
+
+```{r,  fig.width=6,fig.height=3.9,warning = FALSE,out.width="70%", message = FALSE, include = TRUE}
+#different plots to show the age,gender and severity of injury of road type users.
+
+ ggplot(c2020)+
+  geom_bar(aes(x=ctype_comp,fill=sex_of_casualty))+coord_flip() +ggtitle("casualties of road user type _Gender -2020") +
+  xlab("Road user type") + ylab("No. of casualties.")+labs(fill = "Gender")
+
+```
+
+We can see that except for people involved in the car accident most casualties are men.For Car occupants the ratio is almost equal.
+
+## Casualties of road user type by Severity for year 2020{.smaller}
+We can observe that most casualties of less severity are occuring for cars users.
+
+```{r,  fig.width=6,fig.height=3.9,warning = FALSE,out.width="70%", message = FALSE, include = TRUE}
+ggplot(c2020)+
+  geom_bar(aes(x=ctype_comp,fill=casualty_severity))+coord_flip()+ggtitle("Severity of casualties of road user type -2020") +
+  xlab("Road user type") + ylab("No. of casualties.")+labs(fill = "Severity")
+```
+
+
+## Age band of casualties of road user type for year 2020 {.smaller}
+We can observe from the graph, no matter what type of road user, most casualties are in age group 26-35.
+
+```{r,  fig.width=6,fig.height=3.9,warning = FALSE,out.width="70%", message = FALSE, include = TRUE}
+ ggplot(c2020)+
+  geom_bar(aes(x=ctype_comp,fill=age_band_of_casualty))+coord_flip()+ggtitle("Age band of casualties of road user type ") +
+  xlab("Road user type") + ylab("No. of casualties.")+labs(fill = "Age band")
+```
+
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+names(hes)
+data1<-data.frame(hes$ï..road_user_type,HES=hes$X2020,stats19=k$n)
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+(d1_longer<-data1 %>% 
+  pivot_longer(cols = !hes.ï..road_user_type, # Apply to all columns except hes.road_user_type
+               names_to = "origin",
+               values_to = "Number",
+               ) )
+```
+
+## Comparison between HES and stats19 dataset for year 2020{.smaller}
+```{r, fig.width=6,fig.height=4.5, warning = FALSE,out.width="58%", message = FALSE, include = TRUE}
+#comparison between the HES dataset and stat19 dataset.
+ggplot(d1_longer, aes(fill=origin, y=Number, x=hes.ï..road_user_type)) +
+  geom_bar(position='dodge', stat='identity')+coord_flip()+ ggtitle("Comparison between HES and stats19 dataset") +
+  xlab("Road user type") + ylab("No. of casualties.")+labs(fill = "Dataset")
+```
+
+We can see that there is a huge difference in the no. of casualties involved in car accidents may be because severity of car accidents are  mostly slight and only a few are fatal. HES data shows no.of people who are actually admitted in the hospital due to the accident.
+
+```{r , warning = FALSE, message = FALSE, include = FALSE}
+passenger_severity <- casualty_2020[,c("casualty_severity", "car_passenger")]
+passenger_severity <- passenger_severity %>% filter(!car_passenger == "Data missing or out of range"&!car_passenger == "Not car passenger"&!car_passenger =="unknown (self reported)")
+
+```
+```{r , warning = FALSE, message = FALSE, include = FALSE}
+passenger <- passenger_severity %>% group_by(casualty_severity,car_passenger) %>% summarise(count=n())
+print(passenger)
+```
+```{r  , warning = FALSE, message = FALSE, include = FALSE}
+#front_seat<- passenger %>% filter(car_passenger=="Front seat passenger")
+Accident_2020 <- passenger_severity %>%
+ group_by(casualty_severity,car_passenger) %>%  
+  summarise(Count = n()) %>% 
+  ggplot() +
+    geom_col(aes(x = casualty_severity, y = Count, fill = car_passenger)) +labs(y="Number of people", x = "Severity of Injury", title = "Accident severity among Front and Rear seat Passenger")
+    coord_flip()
+```
+
+## Q3:Accident severity among Front and Rear seat passengers in a car{.smaller}
+```{r  ,fig.width=6,fig.height=3, warning = FALSE, message = FALSE, include = TRUE}
+Accident_2020
+```
+
+
+From the graph, we could infer that passengers travelling in the front seat of a car has a higher chance of getting injured during an accident.
+
+
+```{r  , warning = FALSE, message = FALSE, include = FALSE}
+#creating new dataset
+vehicle_model <- vehicle_2020[,c("ï..accident_index","generic_make_model","vehicle_type")]
+vehicle_model<-vehicle_model %>% filter(vehicle_model$vehicle_type==c('8','9'))
+
+casualty_data <- casualty_2020[,c("accident_index","casualty_class","casualty_reference","casualty_severity")]
+casualty_data<- casualty_data %>% filter(casualty_data $casualty_severity=='Fatal')
+vehiclemodel_casualty <- full_join(vehicle_model,casualty_data,by=character())
+vehiclemodel_casualty<-vehiclemodel_casualty %>% filter(!vehiclemodel_casualty$casualty_class=='Pedestrian')
+
+```
+```{r  , warning = FALSE, message = FALSE, include = FALSE}
+#creating new column called 'company_name'
+vehiclemodel_casualty <- vehiclemodel_casualty %>% mutate(company_name = str_extract(vehiclemodel_casualty$generic_make_model,"[a-zA-Z]+"))
+vehiclemodel_casualty$company_name[is.na(vehiclemodel_casualty$company_name)] <- "OTHERS"  
+
+```
+```{r  , warning = FALSE, message = FALSE, include = FALSE}
+#passenger_casualty_2020
+passenger_data <- vehiclemodel_casualty  %>% group_by(company_name) %>% summarise(casualty_number=n())%>% arrange(desc(casualty_number)) 
+total_casualty <- sum(vehiclemodel_casualty$casualty_reference)
+passenger_plot <- head(passenger_data,10)
+
+```
+
+## Fatality distribution among Passenger cars{.smaller}
+
+We can infer that the rate of passenger fatality seems to be consistent among the major car brands.Even then this analysis is majorly impacted due to the fact that most of the cases are reported as unclassified. 
+```{r  , fig.width=6,fig.height=5, warning = FALSE,out.width="60%", message = FALSE, include = TRUE}
+pie(passenger_plot$casualty_number,passenger_plot$company_name, main=" Fatality distribution among Passenger Cars(Year:2020) ")
+```
+
+
+
